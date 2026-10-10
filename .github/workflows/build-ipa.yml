@@ -1,0 +1,43 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_zip_url:
+        description: "Direct URL to your game.zip (optional)"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          brew install rustup xcodegen || true
+          echo "/opt/homebrew/opt/rustup/bin" >> $GITHUB_PATH
+          export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+          rustup target add aarch64-apple-ios --toolchain 1.98.1
+
+      - name: Download game zip
+        if: ${{ inputs.game_zip_url != '' }}
+        run: curl -L --fail -o game.zip "${{ inputs.game_zip_url }}"
+
+      - name: Build IPA
+        run: |
+          export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+          if [ -f game.zip ]; then
+            ./make-ios.sh game.zip --ipa
+          else
+            ./make-ios.sh --ipa
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Muguet-ipa
+          path: build/Muguet.ipa
